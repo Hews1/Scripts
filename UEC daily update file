@@ -1,0 +1,37 @@
+--Daily UEC update file in NCDR - A&E,Ambulances,Occupancy,Discharges
+
+SELECT   '72 hours' AS 'Table', Arrival_Date, prov.Organisation_Code AS Provider_Code, prov.Organisation_Name AS Provider_Name, ec.Der_Provider_Site_Code, CASE WHEN Discharge_Destination_SNOMED_CT IS NULL 
+             THEN 'Not Recorded' WHEN Discharge_Destination_SNOMED_CT IN ('1066331000000109', '1066341000000100', '306706006', '1066361000000104', '1066371000000106', '1066391000000105', '1066401000000108', '19712007', '183919006') THEN 'Y' ELSE 'N' END AS Metric_id, 'Over 72 hours' AS 'MetricName', 
+             prov.Integrated_Care_Board_Name AS ICB_Name, SUM(1) AS Val
+FROM     NHSE_SUSPlus_Faster_SUS.dbo.tbl_Data_SUS_EC AS ec INNER JOIN
+             NHSE_Reference.dbo.vw_Ref_ODS_Provider_Hierarchies AS prov ON ec.Der_Provider_Code = prov.Organisation_Code AND prov.Region_Code = 'Y58'
+WHERE   (ec.Der_Activity_Month >= 202408) AND (ec.EC_Department_Type = '01') AND (ec.EC_AttendanceCategory = '1') AND (ec.Der_EC_Duration >= 4320)
+GROUP BY Arrival_Date, prov.Integrated_Care_Board_Name, prov.Organisation_Code, prov.Organisation_Name, ec.Der_Provider_Site_Code, CASE WHEN Discharge_Destination_SNOMED_CT IS NULL THEN 'Not Recorded' WHEN Discharge_Destination_SNOMED_CT IN ('1066331000000109', 
+             '1066341000000100', '306706006', '1066361000000104', '1066371000000106', '1066391000000105', '1066401000000108', '19712007', '183919006') THEN 'Y' ELSE 'N' END
+UNION ALL
+SELECT   'Hospital metrics' AS 'Table', Period, [OrgCode], [Trust_Name], [Site_Code], 'NA' AS 'Metric_id', [MetricName], [STP] AS 'STP_Name', sum([Value]) AS 'Val'
+FROM     [NHSE_PSDM_COVID19].[sitrep].[tbl_AE_Daily_Sitrep]
+WHERE   Region_Name = 'South West' AND Period >= '2024-08-01' AND ([MetricName] IN ('UnavailableBedStrandedPatients', 'G&ATotalBedsOccupied', 'G&ATotalBedsOpen', 'Extended_Patients_Occupied', 'Attendances_Type1', 'AE_Attendances', 'Booked_Type1', 
+             'Booked_Type2', 'Booked_Breaches_Type1', 'Breaches_UTC','Number_of_advance_bookings_UTC', 'Booked_Breaches_Type1', 'AE_Breaches', 'Breaches_Type1', 'AdultTotalG&A_BedsOccupied', 'ArrivingByAmbulance', 'AdultTotalG&A_BedsOpen', 'Beds_occupied_by_long_stay_patients_14_plus_days'))
+GROUP BY  Period, OrgCode, Trust_Name, Site_Code, MetricName, STP, Site_Name
+UNION ALL
+SELECT   '12 hours' AS 'Table', Arrival_Date, prov.Organisation_Code AS Provider_Code, prov.Organisation_Name AS Provider_Name, ec.Der_Provider_Site_Code, CASE WHEN Discharge_Destination_SNOMED_CT IS NULL 
+             THEN 'Not Recorded' WHEN Discharge_Destination_SNOMED_CT IN ('1066331000000109', '1066341000000100', '306706006', '1066361000000104', '1066371000000106', '1066391000000105', '1066401000000108', '19712007', '183919006') THEN 'Y' ELSE 'N' END AS Metric_id, 'Over 12 hours' AS 'MetricName', 
+             prov.Integrated_Care_Board_Name AS ICB_Name, SUM(1) AS Val
+FROM     NHSE_SUSPlus_Faster_SUS.dbo.tbl_Data_SUS_EC AS ec INNER JOIN
+             NHSE_Reference.dbo.vw_Ref_ODS_Provider_Hierarchies AS prov ON ec.Der_Provider_Code = prov.Organisation_Code AND prov.Region_Code = 'Y58'
+WHERE   (ec.Der_Activity_Month >= 202408) AND (ec.EC_Department_Type = '01') AND (ec.EC_AttendanceCategory = '1') AND (ec.Der_EC_Duration >= 720)
+GROUP BY ec.Arrival_Date, prov.Integrated_Care_Board_Name, prov.Organisation_Code, prov.Organisation_Name, ec.Der_Provider_Site_Code, CASE WHEN Discharge_Destination_SNOMED_CT IS NULL THEN 'Not Recorded' WHEN Discharge_Destination_SNOMED_CT IN ('1066331000000109', 
+             '1066341000000100', '306706006', '1066361000000104', '1066371000000106', '1066391000000105', '1066401000000108', '19712007', '183919006') THEN 'Y' ELSE 'N' END
+UNION ALL
+SELECT   'Ambo' AS 'Table', PeriodDateTimeStart, [AcuteOrgCode] AS 'org_code', AcuteOrganisationName AS 'Organisation_Name', SiteCode AS 'Site_code', cast([MetricID] AS varchar) AS 'Metric_id', MetricName, ACUTESTPNAME AS 'STP_Name', 
+             SUM(CAST(MetricValue AS int)) AS 'Val'
+FROM     NHSE_PSDM_COVID19.sitrep.tbl_Ambulance_Sitrep
+WHERE   (MetricID IN ('15', '140', '141', '142', '145')) AND (RegionName = 'South West') AND (PeriodDateTimeStart >= '2024-08-01')
+GROUP BY PeriodDateTimeStart, AcuteOrgCode, AcuteOrganisationName, SiteCode, AcuteSTPName, MetricID, MetricName
+UNION ALL
+SELECT        'Discharge' AS 'Table', Period, [Org_Code], [Organisation_Name], 'NA' AS 'Site_code', 
+                         CASE WHEN [Metric_ID] LIKE 'DIS005%' THEN '21d' ELSE Metric_ID END AS 'Metric_id', [Metric_Name], [STP_Name], sum(cast([Metric_Value] AS int)) AS 'Val'
+FROM            [NHSE_PSDM_COVID19].[sitrep].[vw_Discharge_Sitrep]
+WHERE        Region = 'South West' AND [Period] >= '2024-08-01' AND (Metric_ID IN ('DIS002_Total', 'DIS004a_Total', 'DIS004b_Total'))
+GROUP BY Period, Org_Code, Organisation_Name, Site_Code, STP_Name, CASE WHEN [Metric_ID] LIKE 'DIS005%' THEN '21d' ELSE Metric_ID END, Metric_Name
